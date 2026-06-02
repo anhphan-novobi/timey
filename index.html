@@ -1001,11 +1001,31 @@ function exportCSV(){
   const filtered=getFilteredLogs();
   if(!filtered.length){showToast('No entries to export!');return;}
   const resource=document.getElementById('resourceName').value||'';
-  const rows=[['Resource','Date','Project','Project Code','Task','Description','Duration']];
+  // const rows=[['Resource','Date','Project','Project Code','Task','Description','Duration']];
+  // filtered.forEach(l=>{
+  //   const p=getProject(l.projectId);
+  //   rows.push([resource,l.date||todayStr(),p.name,p.code,l.task,l.desc||'',fmtDur(l.elapsed)]);
+  // });
+  // Group rows with the same Date + Project + Task + Description, sum their durations
+  const groupMap=new Map();
   filtered.forEach(l=>{
     const p=getProject(l.projectId);
-    rows.push([resource,l.date||todayStr(),p.name,p.code,l.task,l.desc||'',fmtDur(l.elapsed)]);
+    const key=[l.date||todayStr(),p.name,p.code,l.task,l.desc||''].join('|||');
+    if(!groupMap.has(key)){
+      groupMap.set(key,{date:l.date||todayStr(),project:p.name,code:p.code,task:l.task,desc:l.desc||'',elapsed:0});
+    }
+    groupMap.get(key).elapsed+=l.elapsed;
   });
+  
+  const rows=[['Resource','Date','Project','Project Code','Task','Description','Duration']];
+  // Sort: date desc, then project name, then task name
+  const grouped=[...groupMap.values()].sort((a,b)=>
+    b.date.localeCompare(a.date)||a.project.localeCompare(b.project)||a.task.localeCompare(b.task)
+  );
+  grouped.forEach(g=>{
+    rows.push([resource,g.date,g.project,g.code,g.task,g.desc,fmtDur(g.elapsed)]);
+  });
+  
   const csv=rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\n');
   const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
   let fname='timey';
